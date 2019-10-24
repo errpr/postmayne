@@ -15,9 +15,27 @@ public static int main(string[] args) {
 }
 
 public class MainWindow : Window {
-    private TextView text_view;
+    private TextView response_body_text_view;
     private ComboBoxText request_method_combo;
     private Entry url_entry;
+
+    private Grid request_header_grid;
+    private int request_header_grid_size = 0;
+
+    private Entry request_body_content_type_entry;
+    private TextView request_body_text_view;
+
+    private const string[] REQUEST_METHODS = {
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+        "CONNECT",
+        "TRACE"
+    };
 
     public MainWindow() {
         this.title = "Postmayne";
@@ -30,16 +48,12 @@ public class MainWindow : Window {
         header.title = this.title;
         this.set_titlebar(header);
 
+        // Primary controls
+
         this.request_method_combo = new ComboBoxText();
-        request_method_combo.append_text("GET");
-        request_method_combo.append_text("POST");
-        request_method_combo.append_text("PUT");
-        request_method_combo.append_text("PATCH");
-        request_method_combo.append_text("DELETE");
-        request_method_combo.append_text("HEAD");
-        request_method_combo.append_text("OPTIONS");
-        request_method_combo.append_text("CONNECT");
-        request_method_combo.append_text("TRACE");
+        foreach (string method in REQUEST_METHODS) {
+            request_method_combo.append_text(method);
+        }
         request_method_combo.set_active(0);
 
         this.url_entry = new Entry();
@@ -48,68 +62,161 @@ public class MainWindow : Window {
         var send_button = new Button.with_label("Send");
         send_button.clicked.connect(on_send_clicked);
         
-        var primary_controls = new Box(Orientation.HORIZONTAL, 0);
-        primary_controls.pack_start(request_method_combo, false, false, 0);
-        primary_controls.pack_start(url_entry, true, true, 0);
-        primary_controls.pack_end(send_button, false, false, 0);
+        var primary_controls = new Box(Orientation.HORIZONTAL, 2);
+        primary_controls.pack_start(request_method_combo, false, false, 2);
+        primary_controls.pack_start(url_entry, true, true, 2);
+        primary_controls.pack_end(send_button, false, false, 2);
 
-        this.text_view = new TextView ();
-        this.text_view.editable = false;
-        this.text_view.cursor_visible = false;
+        // Request header controls
 
-        var scroll = new ScrolledWindow (null, null);
-        scroll.set_policy (PolicyType.AUTOMATIC, PolicyType.AUTOMATIC);
-        scroll.add (this.text_view);
+        var request_header_container = new Box(Orientation.VERTICAL, 2);
+        
+        var request_header_controls_heading_container = new Box(Orientation.HORIZONTAL, 2);
+        var request_header_controls_heading_label = new Label("Request Headers");
+        var request_header_add_button = new Button.with_label("Add");
+        request_header_add_button.clicked.connect(add_request_header_row);
 
-        var vbox = new Box (Orientation.VERTICAL, 0);
-        vbox.pack_start (primary_controls, false, true, 0);
-        vbox.pack_start (scroll, true, true, 0);
-        add (vbox);
+        request_header_controls_heading_container.pack_start(request_header_controls_heading_label, false, false, 2);
+        request_header_controls_heading_container.pack_end(request_header_add_button, false, false, 2);
+        request_header_container.pack_start(request_header_controls_heading_container, true, true, 2);
+
+        this.request_header_grid = new Grid();
+        request_header_grid.insert_row(0);
+        request_header_grid.insert_column(0);
+        request_header_grid.insert_column(1);
+        request_header_grid.insert_column(2);
+        add_request_header_row();
+
+        request_header_container.pack_start(request_header_grid, true, true, 2);
+
+        // Request body editor
+
+        var request_body_container = new Box(Orientation.VERTICAL, 2);
+
+        var request_body_content_type_container = new Box(Orientation.HORIZONTAL, 2);
+        var request_body_content_type_label = new Label("Content Type");
+        request_body_content_type_entry = new Entry();
+        request_body_content_type_container.pack_start(request_body_content_type_label, false, false, 2);
+        request_body_content_type_container.pack_start(request_body_content_type_entry, true, true, 2);
+
+        request_body_text_view = new TextView();
+        var request_body_scrolled_window = new ScrolledWindow(null, null);
+        request_body_scrolled_window.set_policy(PolicyType.AUTOMATIC, PolicyType.AUTOMATIC);
+        request_body_scrolled_window.add(request_body_text_view);
+
+        request_body_container.pack_start(request_body_content_type_container, false, false, 2);
+        request_body_container.pack_start(request_body_scrolled_window, true, true, 2);
+
+        // Response body view
+
+        response_body_text_view = new TextView ();
+        response_body_text_view.editable = false;
+        response_body_text_view.cursor_visible = false;
+
+        var response_body_scrolled_window = new ScrolledWindow (null, null);
+        response_body_scrolled_window.set_policy(PolicyType.AUTOMATIC, PolicyType.AUTOMATIC);
+        response_body_scrolled_window.add(response_body_text_view);
+
+        // Main box around everything
+
+        var vbox = new Box (Orientation.VERTICAL, 2);
+        vbox.pack_start(primary_controls, false, true, 2);
+        vbox.pack_start(request_header_container, false, true, 2);
+        vbox.pack_start(request_body_container, true, true, 2);
+        vbox.pack_start(response_body_scrolled_window, true, true, 2);
+
+        add(vbox);
     }
 
-    private static async void read_lines_async (InputStream stream, TextView text_view) throws IOError {
-        DataInputStream data_stream = new DataInputStream (stream);
-        string line;
+    private void add_request_header_row() {
+        var header_key_entry = new Entry();
+        var header_value_entry = new Entry();
+        var header_delete_button = new Button.with_label("Remove");
+        header_delete_button.clicked.connect(() => {
+            remove_request_header_row(header_delete_button);
+        });
 
-        var sb = new StringBuilder();
+        request_header_grid.insert_row(0);
+        request_header_grid.attach(header_key_entry, 0, 0, 1, 1);
+        request_header_grid.attach(header_value_entry, 1, 0, 1, 1);
+        request_header_grid.attach(header_delete_button, 2, 0, 1, 1);
+        request_header_grid.show_all();
+        request_header_grid_size += 1;
+        print(@"$request_header_grid_size\n");
+    }
 
-        while ((line = yield data_stream.read_line_async()) != null) {
-            sb.append(@"$line\n");
+    private void remove_request_header_row(Widget header_delete_button) {
+        for (int i = 0; i < request_header_grid_size; i++) {
+            var widget = request_header_grid.get_child_at(2, i);
+            if (widget == header_delete_button) {
+                request_header_grid.remove_row(i);
+                request_header_grid_size -= 1;
+                print(@"$request_header_grid_size\n");
+                return;
+            }
         }
-
-        text_view.buffer.set_text(sb.str);
-
+        print("Couldn't delete request header row for some reason\n");
     }
 
     private void on_send_clicked() {
         var session = new Session();
         var logger = new Logger(LoggerLogLevel.MINIMAL, -1);
         session.add_feature(logger);
+
+        var message = new Message(request_method_combo.get_active_text(), url_entry.get_text());
         
-        try {
-            var request = session.request_http(this.request_method_combo.get_active_text(), this.url_entry.get_text());
-            var message = request.get_message();
+        // add request body if we have one
+        if (request_body_text_view.buffer.get_char_count() > 0) {
+            if (request_body_content_type_entry.get_text().length < 1) {
+                print("Can't send a request body without content-type.");
+                response_body_text_view.buffer.set_text("Can't send a request body without content-type.");
+                return;
+            }
+            var data = request_body_text_view.buffer.text;
+            
+            print((string)data);
 
-            print(message.method);
-            print(message.uri.to_string(false));
-            message.request_headers.foreach((name, val) => {
-                print(@"$name : $val\n");
-            });
+            message.set_request(
+                request_body_content_type_entry.get_text(), 
+                MemoryUse.TAKE, 
+                data.data);
+        }
 
-            request.send_async.begin(null, (obj, res) => {
-                try {
-                    InputStream stream = request.send_async.end(res);
+        // insert all the key value pairs from the request header grid
+        for (int i = 0; i < request_header_grid_size; i++) {
+            var key_entry = (Entry)request_header_grid.get_child_at(0, i);
+            var val_entry = (Entry)request_header_grid.get_child_at(1, i);
+            if (key_entry == null || val_entry == null) {
+                continue;
+            }
+            
+            var key = key_entry.get_text();
+            var val = val_entry.get_text();
+            if (key == null || key.length < 1 || val == null || val.length < 1) {
+                continue;
+            }
 
-                    read_lines_async.begin (stream, this.text_view, (obj, res) => {
-                        print("hello");
-                    });
+            message.request_headers.append(key, val);
+        }
 
-                } catch (Error e) {
-                    stderr.printf("Error: %s\n", e.message);
-                }
-            });
-        } catch (Error e) {
-            stderr.printf("Error: %s\n", e.message);
+        print(@"$(message.method) $(message.uri.to_string(false))");
+        session.queue_message(message, on_http_request_complete);
+    }
+
+    private void on_http_request_complete(Session session, Message message) {
+        var response_body = (string)message.response_body.data;
+
+        if (response_body.length < 1) {
+            response_body_text_view.buffer.set_text("No response body");
+            return;
+        }
+
+        var response_body_normalized = response_body.normalize();
+        // google.com's utf8 is busted or something so we convert to ascii
+        if (response_body_normalized == null) {
+            response_body_text_view.buffer.set_text(response_body.to_ascii());
+        } else {
+            response_body_text_view.buffer.set_text(response_body_normalized);
         }
     }
 }
