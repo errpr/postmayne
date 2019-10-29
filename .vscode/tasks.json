@@ -1,0 +1,70 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Convert DWARF to PDB",
+            "type": "shell",
+            "command": "cv2pdb",
+            "args": [
+                "postmayne.exe",
+                "postmayne_pdb.exe",
+                "postmayne_pdb.pdb"
+            ],
+            "group": "build",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Compile w/ Debug",
+            "type": "shell",
+            "command": "valac",
+            "args": [
+                "-g",
+                "src/postmayne.vala",
+                "--pkg=gtk+-3.0",
+                "--pkg=libsoup-2.4"
+            ],
+            "problemMatcher": [
+                "$valac"
+            ],
+            "group": "build",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Compile w/ Debug and C files",
+            "type": "shell",
+            "command": "valac",
+            "args": [
+                "-g",
+                "--save-temps",
+                "src/postmayne.vala",
+                "--pkg=gtk+-3.0",
+                "--pkg=libsoup-2.4"
+            ],
+            "problemMatcher": [
+                "$valac"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Compile Release",
+            "type": "shell",
+            "command": "valac",
+            "args": [
+                "src/postmayne.vala",
+                "--pkg=gtk+-3.0",
+                "--pkg=libsoup-2.4"
+            ],
+            "problemMatcher": [
+                "$valac"
+            ],
+            "group": "build"
+        }
+    ]
+}

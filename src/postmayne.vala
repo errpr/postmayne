@@ -94,7 +94,7 @@ public class MainWindow : Window {
         var request_body_container = new Box(Orientation.VERTICAL, 2);
 
         var request_body_content_type_container = new Box(Orientation.HORIZONTAL, 2);
-        var request_body_content_type_label = new Label("Content Type");
+        var request_body_content_type_label = new Label("Content-Type");
         request_body_content_type_entry = new Entry();
         request_body_content_type_container.pack_start(request_body_content_type_label, false, false, 2);
         request_body_content_type_container.pack_start(request_body_content_type_entry, true, true, 2);
@@ -178,7 +178,7 @@ public class MainWindow : Window {
 
             message.set_request(
                 request_body_content_type_entry.get_text(), 
-                MemoryUse.TAKE, 
+                MemoryUse.COPY, 
                 data.data);
         }
 
@@ -200,10 +200,15 @@ public class MainWindow : Window {
         }
 
         print(@"$(message.method) $(message.uri.to_string(false))");
-        session.queue_message(message, on_http_request_complete);
+        session.queue_message(message, this.on_http_request_complete);
     }
 
     private void on_http_request_complete(Session session, Message message) {
+        if (message == null || message.response_body == null || message.response_body.data == null) {
+            response_body_text_view.buffer.set_text("No response body");
+            return;
+        }
+        
         var response_body = (string)message.response_body.data;
 
         if (response_body.length < 1) {
